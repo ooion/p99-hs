@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 -- 1
 myLast :: [a] -> a
 myLast [] = error "empty list"
@@ -63,3 +65,70 @@ encode (x : y : z)
   where
     es = encode (y : z)
     inc = \(c, x) -> (c + 1, x)
+
+data ListItem a = Multiple Int a | Single a
+  deriving (Show)
+
+-- 11
+encodeModified :: Eq a => [a] -> [ListItem a]
+encodeModified xs = map trans $ encode xs
+  where
+    trans = \(c, x) -> case () of
+      _
+        | c == 1 -> Single x
+        | otherwise -> Multiple c x
+
+-- 12
+decodeModified :: Eq a => [ListItem a] -> [a]
+decodeModified xs = foldl1 (++) $ map trans xs
+  where
+    trans = \case
+      Single x -> [x]
+      Multiple c x -> replicate c x
+
+-- 13 same as 11
+
+-- 14
+dupli :: [a] -> [a]
+dupli [] = []
+dupli (x : xs) = x : x : dupli xs
+
+-- 15
+repli :: [a] -> Int -> [a]
+repli [] _ = []
+repli (x : xs) c = replicate c x ++ repli xs c
+
+-- 16
+dropEvery :: [a] -> Int -> [a]
+dropEvery xs k = map fst $ filter notK $ tag xs
+  where
+    tag = \xs -> zip xs [1 ..]
+    notK = \(_, id) -> mod id k /= 0
+
+-- 17
+split :: [a] -> Int -> ([a], [a])
+split xs k = splitHelper [] xs k
+  where
+    splitHelper xs [] k = (xs, [])
+    splitHelper xs ys 0 = (xs, ys)
+    splitHelper xs (y : ys) k = splitHelper (xs ++ [y]) ys (k -1)
+
+-- 18
+slice :: [a] -> Int -> Int -> [a]
+slice xs k1 k2 = fst $ split (snd $ split xs nk1) nk2
+  where
+    nk1 = k1 - 1
+    nk2 = k2 - nk1
+
+-- 19
+rotate :: [a] -> Int -> [a]
+rotate xs k = uncurry (flip (++)) $ split xs nk
+  where
+    nk = mod k $ length xs
+
+-- 20
+removeAt :: Int -> [a] -> (a, [a])
+removeAt k xs = (xs !! nk, (init . fst) span ++ snd span)
+  where
+    nk = k -1
+    span = split xs k
