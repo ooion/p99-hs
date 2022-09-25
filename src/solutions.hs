@@ -1,5 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 
+import Data.Bifunctor (Bifunctor (first, second))
+
 -- 1
 myLast :: [a] -> a
 myLast [] = error "empty list"
@@ -132,3 +134,42 @@ removeAt k xs = (xs !! nk, (init . fst) span ++ snd span)
   where
     nk = k -1
     span = split xs k
+
+-- 21
+insertAt :: a -> [a] -> Int -> [a]
+insertAt x xs k = fst span ++ [x] ++ snd span
+  where
+    span = split xs (k -1)
+
+-- 22
+range :: Int -> Int -> [Int]
+range x y
+  | x == y = [x]
+  | x > y = []
+  | otherwise = x : range (x + 1) y
+
+-- 23
+
+-- 26
+combinations :: Int -> [a] -> [[a]]
+combinations 0 _ = [[]]
+combinations k [] = []
+combinations k (x : xs) = map (x :) (combinations (k -1) xs) ++ combinations k xs
+
+-- 27
+group :: [Int] -> [a] -> [[[a]]]
+group [] _ = [[]]
+group (g : gs) xs = foldl1 (++) $ map (\x -> map (fst x :) (group gs (snd x))) $ comb g xs
+  where
+    comb 0 t = [([], t)]
+    comb k [] = []
+    comb k (x : xs) =
+      map (first (x :)) (comb (k -1) xs)
+        ++ map (second (x :)) (comb k xs)
+
+-- 28
+lsort :: Ord a => [[a]] -> [[a]]
+lsort xs = sortBy length xs
+  where
+    sortBy _ [] = []
+    sortBy f (x : xs) = sortBy f [y | y <- xs, f y <= f x] ++ (x : sortBy f [y | y <- xs, f y > f x])
