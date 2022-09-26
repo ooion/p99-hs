@@ -1,6 +1,8 @@
 {-# LANGUAGE LambdaCase #-}
 
 import Data.Bifunctor (Bifunctor (first, second))
+import qualified Data.List as List
+import qualified System.Random as Rd
 
 -- 1
 myLast :: [a] -> a
@@ -149,6 +151,24 @@ range x y
   | otherwise = x : range (x + 1) y
 
 -- 23
+rndSelect :: [a] -> Int -> IO [a]
+rndSelect xs n = do
+  gen <- Rd.getStdGen
+  return $ take n [xs !! i | i <- Rd.randomRs (0, length xs - 1) gen]
+
+-- 24
+diffSelect :: Int -> Int -> IO [Int]
+diffSelect n m = do
+  gen <- Rd.getStdGen
+  return $ take n $ List.nub [i | i <- Rd.randomRs (1, m) gen]
+
+-- 25
+rndPermu :: [a] -> IO [a]
+rndPermu xs = do
+  perm <- diffSelect m m
+  return [xs !! (i -1) | i <- perm]
+  where
+    m = length xs
 
 -- 26
 combinations :: Int -> [a] -> [[a]]
