@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 
+import Control.Applicative
 import Data.Bifunctor (Bifunctor (first, second))
 import qualified Data.List as List
 import qualified System.Random as Rd
@@ -376,3 +377,64 @@ huffman xs = go sorted_chars [] init_result
             ((q2, n2), cs2, hs2) = pick cs1 hs1
             hs3 = hs2 ++ [(q1 ++ q2, n1 + n2)]
          in go cs2 hs3 $ updList '1' q2 $ updList '0' q1 res
+
+data Tree a = Empty | Branch a (Tree a) (Tree a)
+  deriving (Show, Eq)
+
+-- 55
+cbalTree :: Int -> [Tree Char]
+cbalTree n
+  | n == 0 = [Empty]
+  | n == 1 = [Branch 'x' Empty Empty]
+  | n1 == n2 = go s1 s2
+  | otherwise = go s1 s2 ++ go s2 s1
+  where
+    n1 = (n - 1) `div` 2
+    n2 = (n - 1) - n1
+    s1 = cbalTree n1
+    s2 = if n1 == n2 then s1 else cbalTree n2
+    go s1 s2 = map (uncurry (Branch 'x')) $ (,) <$> s1 <*> s2
+    go :: [Tree Char] -> [Tree Char] -> [Tree Char]
+
+-- 56
+symmetric :: Tree a -> Bool
+symmetric Empty = True
+symmetric (Branch _ l r) = symmetric' l r
+  where
+    symmetric' Empty Empty = True
+    symmetric' Empty Branch {} = False
+    symmetric' Branch {} Empty = False
+    symmetric' (Branch _ l1 r1) (Branch _ l2 r2) =
+      symmetric' l1 r2 && symmetric' r1 l2
+
+-- 57
+construct :: Ord a => [a] -> Tree a
+construct = foldl ins Empty
+  where
+    ins Empty x = Branch x Empty Empty
+    ins (Branch y l r) x
+      | x <= y = Branch y (ins l x) r
+      | otherwise = Branch y l (ins r x)
+
+-- 58
+symCbalTrees :: Int -> [Tree Char]
+symCbalTrees n
+  | n == 0 = [Empty]
+  | even n = []
+  | otherwise = map (\x -> Branch 'x' x $ rev x) $ cbalTree nn
+  where
+    nn = n `div` 2
+    rev Empty = Empty
+    rev (Branch x l r) = Branch x (rev r) (rev l)
+
+-- 59
+hbalTree :: a -> Int -> [Tree a]
+hbalTree c h
+  | h < 0 = error "h must >= 0"
+  | h == 0 = [Empty]
+  | h == 1 = [Branch c Empty Empty]
+  | otherwise = map (uncurry (Branch c)) all
+  where
+    t1 = hbalTree c (h -1)
+    t2 = hbalTree c (h -2)
+    all = ((,) <$> t1 <*> t2) ++ ((,) <$> t2 <*> t1) ++ ((,) <$> t1 <*> t1)
