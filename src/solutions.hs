@@ -274,3 +274,99 @@ goldbachList lower upper = map goldbach range
     trans lower upper
       | even lower = [lower, lower + 2 .. upper]
       | otherwise = [lower + 1, lower + 3 .. upper]
+
+not' :: Bool -> Bool
+not' True = False
+not' False = True
+
+and' :: Bool -> Bool -> Bool
+and' True True = True
+and' _ _ = False
+
+or' :: Bool -> Bool -> Bool
+or' False False = False
+or' _ _ = True
+
+nor' :: Bool -> Bool -> Bool
+nor' a b = not' $ or' a b
+
+nand' :: Bool -> Bool -> Bool
+nand' a b = not' $ and' a b
+
+xor' :: Bool -> Bool -> Bool
+xor' True False = True
+xor' False True = True
+xor' _ _ = False
+
+impl' :: Bool -> Bool -> Bool
+impl' a b = not' a `or'` b
+
+equ' :: Bool -> Bool -> Bool
+equ' True True = True
+equ' False False = True
+equ' _ _ = False
+
+-- 46
+table :: (Bool -> Bool -> Bool) -> String
+table f = foldl1 newline [to_str (x, y, f x y) | x <- domain, y <- domain]
+  where
+    domain = [True, False]
+    to_str (x, y, z) = show x ++ " " ++ show y ++ " " ++ show z
+    newline x y = x ++ "\n" ++ y
+
+-- 47 same as 46
+infixl 4 `or'`
+
+infixl 4 `nor'`
+
+infixl 5 `xor'`
+
+infixl 6 `and'`
+
+infixl 6 `nand'`
+
+infixl 3 `equ'`
+
+-- 48
+tablen :: Int -> ([Bool] -> Bool) -> String
+tablen n f = foldl1 (++) $ map to_str $ domains n
+  where
+    domains x
+      | x <= 0 = []
+      | x == 1 = [[True], [False]]
+      | otherwise = go True rest ++ go False rest
+      where
+        go x = map (x :)
+        rest = domains (x -1)
+    to_str' [] = "\n"
+    to_str' (x : t) = show x ++ " " ++ to_str' t
+    to_str xs = to_str' $ xs ++ [f xs]
+
+-- 49
+gray :: Int -> [String]
+gray n
+  | n <= 0 = error "n should > 0"
+  | n == 1 = ["0", "1"]
+  | otherwise = s1 ++ s2
+  where
+    prev_gray = gray (n - 1)
+    s1 = map ('0' :) prev_gray
+    s2 = map ('1' :) $ reverse prev_gray
+
+-- 50
+-- huffman :: [(Char, Int)] -> [(Char, [Char])]
+-- huffman xs = go sorted_chars [] init_result
+--   where
+--     sorted_chars = List.sortOn snd xs
+--     init_result = map (\x -> (fst x, "")) xs
+--     upd code c res = map (\(x, y) -> if c == x then (x, code : y) else (x, y)) res
+--     updList code cs res = foldl (\x f -> f x) res $ map (upd code) cs
+--     goc [] = ([], 0)
+--     goc ((c, freq): []) = ([c], freq)
+--     goc ((c0, f0):((c1, f1):_)) = ([c0, c1], f0 + f1)
+
+--     go cs@(c:ts@(t, tt)) [] res
+--       | length cs == 1 = upd '0' (fst c) res
+--     go cs hs res
+--       | length cs + length hs == 1 = res
+--       | 
