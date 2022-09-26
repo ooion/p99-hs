@@ -144,7 +144,7 @@ insertAt x xs k = fst span ++ [x] ++ snd span
     span = split xs (k -1)
 
 -- 22
-range :: Int -> Int -> [Int]
+range :: Integral a => a -> a -> [a]
 range x y
   | x == y = [x]
   | x > y = []
@@ -193,3 +193,84 @@ lsort xs = sortBy length xs
   where
     sortBy _ [] = []
     sortBy f (x : xs) = sortBy f [y | y <- xs, f y <= f x] ++ (x : sortBy f [y | y <- xs, f y > f x])
+
+-- 31
+isPrime :: Integral a => a -> Bool
+isPrime n = n >= 1 && all ((/= 0) . mod n) ps
+  where
+    ps = takeWhile (\x -> x * x <= n) (2 : [3, 5 ..])
+
+-- 32
+myGcd :: Integral a => a -> a -> a
+myGcd a b
+  | b == 0 = a
+  | otherwise = myGcd b (mod a b)
+
+-- 33
+coprime :: Integral a => a -> a -> Bool
+coprime a b = myGcd a b == 1
+
+-- 34
+totient :: Integral a => a -> a
+totient n = fromIntegral $ length [() | x <- [1 .. n], coprime n x]
+
+primes :: [Integer]
+primes = 2 : 3 : sieve (tail primes) [5, 7 ..]
+  where
+    sieve (p : ps) xs = h ++ sieve ps [x | x <- t, rem x p /= 0]
+      where
+        (h, _ : t) = span (< p * p) xs
+    sieve _ _ = error "impl error"
+
+-- 35
+primeFactors :: Integral a => a -> [a]
+primeFactors n = go n primes
+  where
+    countp n p =
+      if rem n p == 0
+        then 1 + countp (div n p) p
+        else 0
+    go 1 _ = []
+    go n (p : ps) = replicate c q ++ go nn ps
+      where
+        q = fromIntegral p
+        c = countp n q
+        nn = div n (q ^ c)
+    go _ _ = error "impl error"
+    go :: Integral a => a -> [Integer] -> [a]
+
+-- 36
+primeFactorsMult :: Integral a => a -> [(a, Int)]
+primeFactorsMult n = go $ primeFactors n
+  where
+    go [] = []
+    go xs@(x : _) = (x, length $ takeWhile (== x) xs) : go (dropWhile (== x) xs)
+
+-- 37
+eulerPhi :: Integral a => a -> a
+eulerPhi n = foldl go n $ primeFactorsMult n
+  where
+    go n (p, _) = div n p * (p -1)
+
+-- 39
+primesR :: Integral a => a -> a -> [a]
+primesR lower upper = takeWhile (<= upper) $ dropWhile (< lower) primes'
+  where
+    primes' = [fromIntegral p | p <- primes]
+
+-- 40
+goldbach :: Integral a => a -> (a, a)
+goldbach n = to_pair $ head $ dropWhile go primes'
+  where
+    primes' = [fromIntegral p | p <- primes]
+    to_pair x = (x, n - x)
+    go x = not $ isPrime (n - x)
+
+-- 41
+goldbachList :: Integral a => a -> a -> [(a, a)]
+goldbachList lower upper = map goldbach range
+  where
+    range = trans lower upper
+    trans lower upper
+      | even lower = [lower, lower + 2 .. upper]
+      | otherwise = [lower + 1, lower + 3 .. upper]
