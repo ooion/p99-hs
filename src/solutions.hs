@@ -354,19 +354,25 @@ gray n
     s2 = map ('1' :) $ reverse prev_gray
 
 -- 50
--- huffman :: [(Char, Int)] -> [(Char, [Char])]
--- huffman xs = go sorted_chars [] init_result
---   where
---     sorted_chars = List.sortOn snd xs
---     init_result = map (\x -> (fst x, "")) xs
---     upd code c res = map (\(x, y) -> if c == x then (x, code : y) else (x, y)) res
---     updList code cs res = foldl (\x f -> f x) res $ map (upd code) cs
---     goc [] = ([], 0)
---     goc ((c, freq): []) = ([c], freq)
---     goc ((c0, f0):((c1, f1):_)) = ([c0, c1], f0 + f1)
-
---     go cs@(c:ts@(t, tt)) [] res
---       | length cs == 1 = upd '0' (fst c) res
---     go cs hs res
---       | length cs + length hs == 1 = res
---       | 
+huffman :: [(Char, Int)] -> [(Char, [Char])]
+huffman xs = go sorted_chars [] init_result
+  where
+    sorted_chars = map (\(c, n) -> ([c], n)) $ List.sortOn snd xs
+    init_result = map (\x -> (fst x, "")) xs
+    upd code c res = map (\(x, y) -> if c == x then (x, code : y) else (x, y)) res
+    updList code cs res = foldl (\x f -> f x) res $ map (upd code) cs
+    pick [] [] = (([], 0), [], [])
+    pick (c : ct) [] = (c, ct, [])
+    pick [] (h : ht) = (h, [], ht)
+    pick cs@(c : ct) hs@(h : ht) =
+      if snd c <= snd h
+        then (c, ct, hs)
+        else (h, cs, ht)
+    go cs hs res
+      | length cs == 1 && null hs = let ((q, _), _, _) = pick cs hs in updList '0' q res
+      | length cs + length hs == 1 = res
+      | otherwise =
+        let ((q1, n1), cs1, hs1) = pick cs hs
+            ((q2, n2), cs2, hs2) = pick cs1 hs1
+            hs3 = hs2 ++ [(q1 ++ q2, n1 + n2)]
+         in go cs2 hs3 $ updList '1' q2 $ updList '0' q1 res
