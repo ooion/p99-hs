@@ -699,3 +699,65 @@ ds2tree (x : xs) = (Branch x l r, xs'')
 tree2ds :: Tree Char -> String
 tree2ds Empty = "."
 tree2ds (Branch c l r) = (c : tree2ds l) ++ tree2ds r
+
+data MTree a = Node a [MTree a]
+  deriving (Eq, Show)
+
+mtree1 = Node 'a' []
+
+mtree2 = Node 'a' [Node 'b' []]
+
+mtree3 = Node 'a' [Node 'b' [Node 'c' []]]
+
+mtree4 = Node 'b' [Node 'd' [], Node 'e' []]
+
+mtree5 =
+  Node
+    'a'
+    [ Node 'f' [Node 'g' []],
+      Node 'c' [],
+      Node 'b' [Node 'd' [], Node 'e' []]
+    ]
+
+-- 70C
+nnodes :: MTree a -> Int
+nnodes (Node _ children) = foldl upd 1 children
+  where
+    upd n t = n + nnodes t
+
+-- 70
+mtreeToString :: MTree Char -> String
+mtreeToString (Node x []) = x : "^"
+mtreeToString (Node x cs) = (x : concatMap mtreeToString cs) ++ "^"
+
+stringToMtree :: String -> MTree Char
+stringToMtree xs = fst $ go xs
+  where
+    go (x : '^' : xs) = (Node x [], xs)
+    go (x : xs) = let (cs, xs') = goc xs in (Node x cs, xs')
+    go [] = error "parse error"
+    goc ('^' : xs) = ([], xs)
+    goc xs =
+      let (c, xs') = go xs
+          (cs, xs'') = goc xs'
+       in (c : cs, xs'')
+
+-- 71
+ipl :: MTree a -> Int
+ipl = ipl' 1
+  where
+    ipl' h (Node _ cs) =
+      h * length cs + sum (map (ipl' (h + 1)) cs)
+
+-- 72
+bottomUp :: MTree Char -> String
+bottomUp (Node x []) = [x]
+bottomUp (Node x cs) = concatMap bottomUp cs ++ [x]
+
+-- 73
+lisp :: MTree Char -> String
+lisp (Node x []) = [x]
+lisp (Node x cs) = ('(' : [x]) ++ content' ++ ")"
+  where
+    content = unwords $ map lisp cs
+    content' = if null content then content else ' ' : content
