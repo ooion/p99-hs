@@ -1,6 +1,8 @@
 {-# LANGUAGE LambdaCase #-}
 
 import Control.Applicative
+import Control.Monad (forM, forM_)
+-- import Control.Monad.Trans.State
 import Data.Bifunctor (Bifunctor (first, second))
 import qualified Data.List as List
 import GHC (RecordConTc (rcon_con_expr))
@@ -631,3 +633,69 @@ layout'' t = updx nt xbias
       Branch (a, (x + ax, y)) (updx l ax) (updx r ax)
     (x1, _, nt) = aux t 1
     xbias = if null x1 then 1 else 1 - minimum x1
+
+-- 67A
+treeToString :: Tree Char -> String
+treeToString Empty = ""
+treeToString (Branch c Empty Empty) = [c]
+treeToString (Branch c l r) = c : '(' : content ++ ")"
+  where
+    content = treeToString l ++ "," ++ treeToString r
+
+stringToTree :: (MonadFail m) => String -> m (Tree Char)
+stringToTree "" = return Empty
+stringToTree [c] = return $ Branch c Empty Empty
+stringToTree str = tfs str >>= \("", t) -> return t
+  where
+    tfs a@(x : xs)
+      | x == ',' || x == ')' = return (a, Empty)
+    tfs (x : y : xs)
+      | y == ',' || y == ')' = return (y : xs, Branch x Empty Empty)
+      | y == '(' = do
+        (',' : xs', l) <- tfs xs
+        (')' : xs'', r) <- tfs xs'
+        return (xs'', Branch x l r)
+    tfs _ = fail "bad parse"
+
+-- 68
+treeToPreorder :: Tree Char -> String
+treeToPreorder Empty = []
+treeToPreorder (Branch c l r) = c : treeToPreorder l ++ treeToPreorder r
+
+treeToInorder :: Tree Char -> String
+treeToInorder Empty = []
+treeToInorder (Branch c l r) = treeToInorder l ++ c : treeToInorder r
+
+preInTree :: MonadFail m => String -> String -> m (Tree Char)
+preInTree [] [] = return Empty
+preInTree po@(x : xs) io = do
+  (lio, _ : rio) <- return $ break (== x) io
+  (lpo, rpo) <- return $ splitAt (length lio) xs
+  l <- preInTree lpo lio
+  r <- preInTree rpo rio
+  return $ Branch x l r
+preInTree _ _ = fail "woops"
+
+preInTree' :: Monad m => String -> String -> m (Tree Char)
+preInTree' [] [] = return Empty
+preInTree' po io = pure act_t
+  where
+    (act_t, _) = foldl upd (Empty, []) (zip po io)
+    upd (t, xs) (p, i) = (ins p xs t, i : xs)
+    ins x _ Empty = Branch x Empty Empty
+    ins x xs (Branch y l r)
+      | x `elem` xs = Branch y l (ins x xs r)
+      | otherwise = Branch y (ins x xs l) r
+
+-- 69
+ds2tree :: String -> (Tree Char, String)
+ds2tree [] = (Empty, "")
+ds2tree ('.' : xs) = (Empty, xs)
+ds2tree (x : xs) = (Branch x l r, xs'')
+  where
+    (l, xs') = ds2tree xs
+    (r, xs'') = ds2tree xs'
+
+tree2ds :: Tree Char -> String
+tree2ds Empty = "."
+tree2ds (Branch c l r) = (c : tree2ds l) ++ tree2ds r
