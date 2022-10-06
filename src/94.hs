@@ -1,7 +1,12 @@
+{-# LANGUAGE TupleSections #-}
+
+import Data.Array
 import Data.Bifunctor
+import qualified Data.IntMap as Array
 import Data.List
 import qualified Data.Map as M
 import Data.Maybe
+import Debug.Trace
 
 -- 90
 queens :: Int -> [[Int]]
@@ -61,3 +66,38 @@ closedKnights n = go M.empty 1 (1, 1)
           if m == n * n
             then [get_solution visited']
             else concatMap (go visited' (m + 1)) nexts'
+
+-- 92
+vonKoch :: [(Int, Int)] -> [[Int]]
+vonKoch edges = go M.empty M.empty 1
+  where
+    adde a (x, y) =
+      zipWith
+        ( \lst k ->
+            if k == x
+              then y : lst
+              else if k == y then x : lst else lst
+        )
+        a
+        [1 ..]
+    adjs =  listArray (1, n) $ foldl adde (replicate n []) edges
+    en = length edges
+    n = en + 1
+
+    get_adj_val vx x = [v | y <- adjs ! x, (v, z) <- M.toList vx, z == y]
+    vis_to_v vx = map fst $ sortOn snd $ M.toList vx
+    go vx ve i
+      | i == n + 1 = [vis_to_v vx]
+      | otherwise = concatMap sub vals
+      where
+        avals = get_adj_val vx i
+        get_diff val = map (\av -> abs (av - val)) avals
+        valid_d d = d >= 1 && d <= en && isNothing (M.lookup d ve)
+        valid val =
+          isNothing (M.lookup val vx)
+            && all (\av -> valid_d (abs (av - val))) avals
+        upd val =
+          let ve' = foldl (\v d -> M.insert d i v) ve (get_diff val)
+           in (M.insert val i vx, ve')
+        vals = filter valid [1 .. n]
+        sub val = let (vx', ve') = upd val in go vx' ve' (i + 1)
