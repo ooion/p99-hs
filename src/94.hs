@@ -1,12 +1,19 @@
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE RankNTypes #-}
 
+import Cmm (CmmNode (res))
+import Control.Monad (forM)
+import Control.Monad.IO.Class (MonadIO (liftIO))
+import Control.Monad.ST
 import Data.Array
+import Data.Array.ST
 import Data.Bifunctor
 import qualified Data.IntMap as Array
 import Data.List
 import qualified Data.Map as M
 import Data.Maybe
 import Debug.Trace
+import GHC.Arr (STArray (STArray), freezeSTArray)
+import GHCi.Message (QState (qsLocation))
 
 -- 90
 queens :: Int -> [[Int]]
@@ -80,7 +87,7 @@ vonKoch edges = go M.empty M.empty 1
         )
         a
         [1 ..]
-    adjs =  listArray (1, n) $ foldl adde (replicate n []) edges
+    adjs = listArray (1, n) $ foldl adde (replicate n []) edges
     en = length edges
     n = en + 1
 
@@ -101,3 +108,58 @@ vonKoch edges = go M.empty M.empty 1
            in (M.insert val i vx, ve')
         vals = filter valid [1 .. n]
         sub val = let (vx', ve') = upd val in go vx' ve' (i + 1)
+
+-- 94
+regular :: Int -> Int -> [[(Int, Int)]]
+regular n d
+  | odd n && odd d = []
+  | d == 0 = [[]]
+  | n == 1 = []
+  | otherwise = graphs''
+  where
+    graphs = runST (go 1 2 state [])
+    graphs' = nub $ map sort graphs
+    graphs'' = nub $ map ming graphs'
+    perms = perm n
+    trans p g = map (transe . bimap (p !) (p !)) g
+    transe (x, y) = if x < y then (x, y) else (y, x)
+    ming g = minimum $ map (sort.(`trans` g)) perms
+
+    perm m = runST $ perm' m sarr
+      where
+        sarr = newListArray (1, m) [1 .. m] :: ST s (STArray s Int Int)
+        perm' n sa
+          | n == 1 = do a <- sa; lst <- freezeSTArray a; pure [lst]
+          | otherwise = do
+            a <- sa
+            init <- perm' (n -1) (pure a)
+            res <- forM [1 .. (n -1)] $ \i -> do
+              iv <- readArray a i
+              nv <- readArray a n
+              writeArray a i nv
+              writeArray a n iv
+              res <- perm' (n -1) (pure a)
+              writeArray a i iv
+              writeArray a n nv
+              pure res
+            pure $ concat (init : res)
+
+    state = newArray (1, n) d :: ST s (STArray s Int Int)
+    go :: Int -> Int -> ST s (STArray s Int Int) -> [(Int, Int)] -> ST s [[(Int, Int)]]
+    go x y ds es
+      | x == n = do arr <- ds; d <- readArray arr n; pure [es | d == 0]
+      | y == n + 1 = do arr <- ds; d <- readArray arr x; if d == 0 then go (x + 1) (x + 2) ds es else pure []
+      | otherwise = do
+        arr <- ds
+        dx <- readArray arr x
+        dy <- readArray arr y
+        let d = minimum [dx, dy, 1]
+        subs <- forM [0 .. d] $ \di -> do
+          writeArray arr x (dx - di)
+          writeArray arr y (dy - di)
+          let es' = if di == 0 then es else (x, y) : es
+          res <- go x (y + 1) (pure arr) es'
+          writeArray arr x dx
+          writeArray arr y dy
+          pure res
+        pure $ concat subs
