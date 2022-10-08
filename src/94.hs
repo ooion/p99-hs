@@ -1,8 +1,6 @@
 {-# LANGUAGE RankNTypes #-}
 
-import Cmm (CmmNode (res))
-import Control.Monad (forM)
-import Control.Monad.IO.Class (MonadIO (liftIO))
+import Control.Monad (foldM, forM)
 import Control.Monad.ST
 import Data.Array
 import Data.Array.ST
@@ -11,9 +9,9 @@ import qualified Data.IntMap as Array
 import Data.List
 import qualified Data.Map as M
 import Data.Maybe
+import Data.Ratio
 import Debug.Trace
 import GHC.Arr (STArray (STArray), freezeSTArray)
-import GHCi.Message (QState (qsLocation))
 
 -- 90
 queens :: Int -> [[Int]]
@@ -109,6 +107,152 @@ vonKoch edges = go M.empty M.empty 1
         vals = filter valid [1 .. n]
         sub val = let (vx', ve') = upd val in go vx' ve' (i + 1)
 
+-- 93
+puzzle :: [Int] -> [String]
+puzzle xs
+  | n < 2 = []
+  | otherwise = res
+  where
+    n = length xs
+    res =
+      concatMap
+        ( \i ->
+            let (l, r) = splitAt i xs
+             in join (go l) (go r)
+        )
+        [1 .. (n -1)]
+    join l r =
+      [ ls ++ " = " ++ rs
+        | (ls, lv) <- l,
+          (rs, rv) <- r,
+          lv == rv
+      ]
+
+    gen_ops 0 = [""]
+    gen_ops n = [x : xs | x <- "+-/*", xs <- gen_ops (n -1)]
+    go xs = trace (show res) res
+      where
+        n = length xs
+        opss = gen_ops (n -1)
+        parens = genFineParen (n + 1)
+        candidates = [(ops, paren) | ops <- opss, paren <- parens, valid ops paren]
+        xs' :: [Ratio Int]
+        xs' = map fromIntegral xs
+        res = do
+          (ops, paren) <- candidates
+          let orders = calcOrders paren ops
+          let (res, t) = calc orders ops xs'
+          [(calcS paren ops xs, res) | not t]
+
+calcS paren ops xs = concat sxs'''
+  where
+    sxs = map show xs
+    sxs' =
+      zipWith
+        ( \p x ->
+            if p <= 0
+              then x
+              else replicate p '(' ++ x
+        )
+        paren
+        sxs
+    sxs'' =
+      zipWith
+        ( \p x ->
+            if p >= 0
+              then x
+              else x ++ replicate (- p) ')'
+        )
+        (tail paren)
+        sxs'
+    sxs''' = head sxs'' : zipWith (:) ops (tail sxs'')
+
+calc orders ops xs = aux orders ops xs [] False
+  where
+    upd (xs, True) _ = (xs, True)
+    upd (x : y : xs, _) op
+      | op == '+' = ((x + y) : xs, False)
+      | op == '-' = ((x - y) : xs, False)
+      | op == '*' = ((x * y) : xs, False)
+      | op == '/' = if y /= 0 then ((x / y) : xs, False) else (y : xs, True)
+      | otherwise = error "invalid op"
+    upd _ _ = error "invalid pattern 1"
+
+    aux [] ops xs bufs div_zero = (head xs', div_zero')
+      where
+        (xs', div_zero') = foldl (\a b -> upd a (snd b)) (xs, div_zero) bufs
+    aux (o : os) (op : ops) xs [] div_zero = aux os ops xs [(o, op)] div_zero
+    aux (o : os) (op : ops) xs bufs div_zero = aux os ops xs' bbufs div_zero'
+      where
+        abufs = takeWhile ((>= o) . fst) bufs
+        bbufs = dropWhile ((>= o) . fst) bufs
+        (xs', div_zero') = foldl (\a b -> upd a (snd b)) (xs, div_zero) abufs
+    aux _ _ _ _ _ = error "invalid pattern 2"
+
+valid ops parr = orders `notElem` left_orders
+  where
+    orders = calcOrders parr ops
+    n = length parr
+    ps = toParenPairs parr
+    left_order p = calcOrders (toParenArr n $ filter (/= p) ps) ops
+    left_orders = map left_order ps
+
+calcOrders parr ops = orders
+  where
+    op_pri op = if op `elem` "+-" then 0 else 1
+    bases =
+      init . drop 2 . map fst $
+        scanl
+          ( \(b, last) d ->
+              if d < 0
+                then (b + 2 * d + last, 0)
+                else (b + last, 2 * d)
+          )
+          (0, 0)
+          parr
+    orders = zipWith (\b op -> b + op_pri op) bases ops
+
+genFineParen n = filter valid parens
+  where
+    parens = genGrossParen n
+    valid p = length ps == length ps'
+      where
+        ps = toParenPairs p
+        ps' = nub ps
+
+toParenArr n pairs = res
+  where
+    aux i (x, y)
+      | i == x = 1
+      | i == y = -1
+      | otherwise = 0
+    res = [sum (map (aux i) pairs) | i <- [0 .. (n -1)]]
+
+toParenPairs parr = c
+  where
+    expand d =
+      if d >= 0
+        then replicate d 1
+        else replicate (- d) (-1)
+    a =
+      concatMap (\(x, i) -> zip (expand x) (repeat i)) $
+        zip parr [0 :: Int ..]
+    find vi k =
+      (snd . head) $
+        dropWhile ((> 0) . fst) $
+          scanl1 (\(x, _) (y, j) -> (x + y, j)) $ drop k a
+    b = filter ((> 0) . fst . fst) $ zip a [0 ..]
+    c = map (\((v, i), k) -> (i, find (v, i) k)) b
+
+genGrossParen n = gross 0 [] 0
+  where
+    gross x a d
+      | x == n = [reverse a | d == 0]
+      | otherwise =
+        let m = n - x - 1
+            res = concatMap (\i -> gross (x + 1) (i : a) (d + i)) [(- d) .. m]
+         in res
+
 -- 94
 regular :: Int -> Int -> [[(Int, Int)]]
 regular n d
@@ -123,7 +267,7 @@ regular n d
     perms = perm n
     trans p g = map (transe . bimap (p !) (p !)) g
     transe (x, y) = if x < y then (x, y) else (y, x)
-    ming g = minimum $ map (sort.(`trans` g)) perms
+    ming g = minimum $ map (sort . (`trans` g)) perms
 
     perm m = runST $ perm' m sarr
       where
