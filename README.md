@@ -4,7 +4,7 @@
 
 ### solutions
 
-a.hs contains solutions which problem number not greater than a.
+a.hs contains solutions that problem number is not greater than a.
 
 for example. 30.hs contains p1 - p30. p50.hs contains p31 - p50
 
