@@ -130,7 +130,7 @@ puzzle xs
 
     gen_ops 0 = [""]
     gen_ops n = [x : xs | x <- "+-/*", xs <- gen_ops (n -1)]
-    go xs = trace (show res) res
+    go xs = res
       where
         n = length xs
         opss = gen_ops (n -1)
@@ -141,117 +141,128 @@ puzzle xs
         res = do
           (ops, paren) <- candidates
           let orders = calcOrders paren ops
-          let (res, t) = calc orders ops xs'
-          [(calcS paren ops xs, res) | not t]
+          let (ans, div_zero) = calc orders ops xs'
+          [(calcS paren ops xs, ans) | not div_zero]
 
-calcS paren ops xs = concat sxs'''
-  where
-    sxs = map show xs
-    sxs' =
-      zipWith
-        ( \p x ->
-            if p <= 0
-              then x
-              else replicate p '(' ++ x
-        )
-        paren
-        sxs
-    sxs'' =
-      zipWith
-        ( \p x ->
-            if p >= 0
-              then x
-              else x ++ replicate (- p) ')'
-        )
-        (tail paren)
-        sxs'
-    sxs''' = head sxs'' : zipWith (:) ops (tail sxs'')
-
-calc orders ops xs = aux orders ops xs [] False
-  where
-    upd (xs, True) _ = (xs, True)
-    upd (x : y : xs, _) op
-      | op == '+' = ((x + y) : xs, False)
-      | op == '-' = ((x - y) : xs, False)
-      | op == '*' = ((x * y) : xs, False)
-      | op == '/' = if y /= 0 then ((x / y) : xs, False) else (y : xs, True)
-      | otherwise = error "invalid op"
-    upd _ _ = error "invalid pattern 1"
-
-    aux [] ops xs bufs div_zero = (head xs', div_zero')
+    calcS paren ops xs = concat sxs'''
       where
-        (xs', div_zero') = foldl (\a b -> upd a (snd b)) (xs, div_zero) bufs
-    aux (o : os) (op : ops) xs [] div_zero = aux os ops xs [(o, op)] div_zero
-    aux (o : os) (op : ops) xs bufs div_zero = aux os ops xs' bbufs div_zero'
+        sxs = map show xs
+        sxs' =
+          zipWith
+            ( \p x ->
+                if p <= 0
+                  then x
+                  else replicate p '(' ++ x
+            )
+            paren
+            sxs
+        sxs'' =
+          zipWith
+            ( \p x ->
+                if p >= 0
+                  then x
+                  else x ++ replicate (- p) ')'
+            )
+            (tail paren)
+            sxs'
+        sxs''' = head sxs'' : zipWith (:) ops (tail sxs'')
+
+    calc orders ops xs = aux orders ops (tail xs) [head xs] [] False
       where
-        abufs = takeWhile ((>= o) . fst) bufs
-        bbufs = dropWhile ((>= o) . fst) bufs
-        (xs', div_zero') = foldl (\a b -> upd a (snd b)) (xs, div_zero) abufs
-    aux _ _ _ _ _ = error "invalid pattern 2"
+        upd (xs, True) _ = (xs, True)
+        upd (x : y : xs, _) op
+          | op == '+' = ((y + x) : xs, False)
+          | op == '-' = ((y - x) : xs, False)
+          | op == '*' = ((y * x) : xs, False)
+          | op == '/' = if x /= 0 then ((y / x) : xs, False) else (y : xs, True)
+          | otherwise = error "invalid op"
+        upd _ _ = error "invalid pattern 1"
 
-valid ops parr = orders `notElem` left_orders
-  where
-    orders = calcOrders parr ops
-    n = length parr
-    ps = toParenPairs parr
-    left_order p = calcOrders (toParenArr n $ filter (/= p) ps) ops
-    left_orders = map left_order ps
+        aux [] _ _ xbuf oopbuf div_zero =
+          let (xbuf', div_zero') =
+                foldl (\xb oop -> upd xb (snd oop)) (xbuf, div_zero) oopbuf
+           in (head xbuf', div_zero')
+        aux (o : os) (op : ops) (x : xs) xbuf oopbuf div_zero =
+          let obuf0 = takeWhile ((>= o) . fst) oopbuf
+              obuf1 = dropWhile ((>= o) . fst) oopbuf
+              (xbuf', div_zero') =
+                foldl (\xb oop -> upd xb (snd oop)) (xbuf, div_zero) obuf0
+           in aux os ops xs (x : xbuf') ((o, op) : obuf1) div_zero'
+        aux _ _ _ _ _ _ = error "invalid pattern 2"
 
-calcOrders parr ops = orders
-  where
-    op_pri op = if op `elem` "+-" then 0 else 1
-    bases =
-      init . drop 2 . map fst $
-        scanl
-          ( \(b, last) d ->
-              if d < 0
-                then (b + 2 * d + last, 0)
-                else (b + last, 2 * d)
-          )
-          (0, 0)
-          parr
-    orders = zipWith (\b op -> b + op_pri op) bases ops
-
-genFineParen n = filter valid parens
-  where
-    parens = genGrossParen n
-    valid p = length ps == length ps'
+    valid ops parr = orders `notElem` left_orders
       where
-        ps = toParenPairs p
-        ps' = nub ps
+        orders = calcOrders parr ops
+        n = length parr
+        ps = toParenPairs parr
+        left_order p = calcOrders (toParenArr n $ filter (/= p) ps) ops
+        left_orders = map left_order ps
 
-toParenArr n pairs = res
-  where
-    aux i (x, y)
-      | i == x = 1
-      | i == y = -1
-      | otherwise = 0
-    res = [sum (map (aux i) pairs) | i <- [0 .. (n -1)]]
+    calcOrders parr ops = normalize orders
+      where
+        paren_pri = 100
+        normalize os =
+          let sorted_os = nub $ sort os
+           in map (fromJust . (`elemIndex` sorted_os)) os
 
-toParenPairs parr = c
-  where
-    expand d =
-      if d >= 0
-        then replicate d 1
-        else replicate (- d) (-1)
-    a =
-      concatMap (\(x, i) -> zip (expand x) (repeat i)) $
-        zip parr [0 :: Int ..]
-    find vi k =
-      (snd . head) $
-        dropWhile ((> 0) . fst) $
-          scanl1 (\(x, _) (y, j) -> (x + y, j)) $ drop k a
-    b = filter ((> 0) . fst . fst) $ zip a [0 ..]
-    c = map (\((v, i), k) -> (i, find (v, i) k)) b
+        pri op = if op `elem` "+-" then 0 else div paren_pri 2
+        bases =
+          init . drop 2 . map fst $
+            scanl
+              ( \(b, las) d ->
+                  if d < 0
+                    then (b + paren_pri * d + las, 0)
+                    else (b + las, paren_pri * d)
+              )
+              (0, 0)
+              parr
+        orders =
+          zipWith3
+            (\b op i -> i + b + pri op)
+            bases
+            ops
+            (reverse [1 .. length ops])
 
-genGrossParen n = gross 0 [] 0
-  where
-    gross x a d
-      | x == n = [reverse a | d == 0]
-      | otherwise =
-        let m = n - x - 1
-            res = concatMap (\i -> gross (x + 1) (i : a) (d + i)) [(- d) .. m]
-         in res
+    genFineParen n = filter valid parens
+      where
+        parens = genGrossParen n
+        valid p = (0, n -1) `notElem` ps && length ps == length ps'
+          where
+            ps = toParenPairs p
+            ps' = nub ps
+
+    toParenArr n pairs = res
+      where
+        aux i (x, y)
+          | i == x = 1
+          | i == y = -1
+          | otherwise = 0
+        res = [sum (map (aux i) pairs) | i <- [0 .. (n -1)]]
+
+    toParenPairs parr = c
+      where
+        expand d =
+          if d >= 0
+            then replicate d 1
+            else replicate (- d) (-1)
+        a =
+          concatMap (\(x, i) -> zip (expand x) (repeat i)) $
+            zip parr [0 :: Int ..]
+        find vi k =
+          (snd . head) $
+            dropWhile ((> 0) . fst) $
+              scanl1 (\(x, _) (y, j) -> (x + y, j)) $ drop k a
+        b = filter ((> 0) . fst . fst) $ zip a [0 ..]
+        c = map (\((v, i), k) -> (i, find (v, i) k)) b
+
+    genGrossParen n = gross 0 [] 0
+      where
+        gross x a d
+          | x == n = [reverse a | d == 0]
+          | otherwise =
+            let m = n - d - x - 1
+                res = concatMap (\i -> gross (x + 1) (i : a) (d + i)) [(- d) .. m]
+             in res
 
 -- 94
 regular :: Int -> Int -> [[(Int, Int)]]
