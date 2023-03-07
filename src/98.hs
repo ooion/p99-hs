@@ -1,4 +1,4 @@
-import Data.List (intercalate)
+import Data.List
 
 genRowCandidates :: Int -> [Int] -> [[Int]]
 genRowCandidates n rowXs = go 0 rowXs []
@@ -39,30 +39,21 @@ solve rowXs colXs = reverse . snd $ go candidates colXs zrow []
           (ok, cols') -> if ok then go cands cols' xs (xs : rows) else (False, rows)
 
 nonogram :: [[Int]] -> [[Int]] -> String
-nonogram rowXs colXs = intercalate "\n" (p1_lines ++ p2_lines)
+nonogram rowXs colXs = unlines (p1_lines ++ p2_lines)
   where
     xs = solve rowXs colXs
+    rowXs2s rxs = concatMap (\r -> " " ++ show r) rxs
     -- part 1 lines
     p1_lines =
       let zs = zip xs rowXs
           x2g x = if x == 0 then "_|" else "X|"
           line2s s = '|' : concatMap x2g s
-          rowXs2s rxs = concatMap (\r -> " " ++ show r) rxs
           f (s, rxs) = line2s s ++ rowXs2s rxs
        in map f zs
     -- part 2 lines
     p2_lines =
-      let takeCol [] = (0, [])
-          takeCol (c : cs) = (c, cs)
-          takeCols = map (takeCol . snd)
-          canTake = any ((/= 0) . fst)
-          colXsSeq = map takeCol colXs : map takeCols colXsSeq
-          col_rows = takeWhile canTake colXsSeq
-          x2g x = if x == 0 then "  " else ' ' : show x
-          x2l xs = concatMap (x2g . fst) xs
-       in map x2l col_rows
-
--- do putStr $ show (length p2_lines)
+      let cols' = transpose colXs
+       in map rowXs2s cols'
 
 main :: IO ()
 main = putStr $ nonogram [[3], [2, 1], [3, 2], [2, 2], [6], [1, 5], [6], [1], [2]] [[1, 2], [3, 1], [1, 5], [7, 1], [5], [3], [4], [3]]
